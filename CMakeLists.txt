@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.7)
 project(tf)
+SET(CMAKE_C_COMPILER cc)
+SET(CMAKE_CXX_COMPILER gcc)
 
 # This is a dummy CMakeLists file for CLion, which still doesn't understand Makefiles.
 # Do not try to build the library using this file, it's here only for static analysis.
@@ -7,19 +9,13 @@ project(tf)
 set(CMAKE_CXX_STANDARD GNU89)
 
 set(SOURCE_FILES
-        demo/simple/test.c
-        demo/socket_demo/master.c
-        demo/socket_demo/slave.c
-        demo/socket_demo/TF_Config.h
-        demo/demo.c
-        demo/demo.h
-        TinyFrame.c
-        TinyFrame.h
-        TF_Config.example.h
+        demo/demo_simple.c
+        demo/demo_simple.h
+        TinyModbus.c
+        TinyModbus.h
+        TinyModbus_Config.h
         demo/utils.c
         demo/utils.h
         )
-
-include_directories(demo/simple)
 
 add_executable(tf ${SOURCE_FILES})
