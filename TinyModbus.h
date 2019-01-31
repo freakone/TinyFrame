@@ -103,79 +103,30 @@ static inline void TM_ClearQueryMsg(TM_QueryMsg *msg)
 
 // ---------------------------------- API CALLS --------------------------------------
 TM_RawMessage TM_ConstructModbusBody(TM_QueryMsg *msg);
-
-/**
- * Accept incoming bytes & parse frames
- *
- * @param tf - instance
- * @param buffer - byte buffer to process
- * @param count - nr of bytes in the buffer
- */
+uint16_t TM_CRC16(uint8_t *data, uint16_t N);
 void TM_Accept(TinyModbus *tf, const uint8_t *buffer, uint32_t count);
-
-/**
- * Accept a single incoming byte
- *
- * @param tf - instance
- * @param c - a received char
- */
 void TM_AcceptChar(TinyModbus *tf, uint8_t c);
-
-/**
- * This function should be called periodically.
- * The time base is used to time-out partial frames in the parser and
- * automatically reset it.
- * It's also used to expire ID listeners if a timeout is set when registering them.
- *
- * A common place to call this from is the SysTick handler.
- *
- * @param tf - instance
- */
 void TM_Tick(TinyModbus *tf);
-
-/**
- * Reset the frame parser state machine.
- * This does not affect registered listeners.
- *
- * @param tf - instance
- */
 void TM_ResetParser(TinyModbus *tf);
 
 // ---------------------------- MESSAGE LISTENERS -------------------------------
 
-/**
- * Register a generic listener.
- *
- * @param tf - instance
- * @param cb - callback
- * @return slot index (for removing), or TF_ERROR (-1)
- */
 bool TM_AddGenericListener(TinyModbus *tf, TM_Listener cb);
-
-/**
- * Remove a generic listener by function pointer
- *
- * @param tf - instance
- * @param cb - callback function to remove
- */
 bool TM_RemoveGenericListener(TinyModbus *tf, TM_Listener cb);
 
 // ---------------------------- FRAME TX FUNCTIONS ------------------------------
 
-bool TM_Send(TinyModbus *tf, TM_QueryMsg *msg, uint16_t timeout);
+bool TM_SendSimple(TinyModbus *tf, uint8_t address, uint8_t function, uint16_t register_address, uint16_t data);
+bool TM_Send(TinyModbus *tf, TM_QueryMsg *msg);
 
 // ---------------------------------- INTERNAL ----------------------------------
 // This is publicly visible only to allow static init.
 
 enum TM_State_
 {
-    TFState_SOF = 0,    //!< Wait for SOF
-    TFState_LEN,        //!< Wait for Number Of Bytes
-    TFState_HEAD_CKSUM, //!< Wait for header Checksum
-    TFState_ID,         //!< Wait for ID
-    TFState_TYPE,       //!< Wait for message type
-    TFState_DATA,       //!< Receive payload
-    TFState_DATA_CKSUM  //!< Wait for Checksum
+    TMState_SOF = 0,
+    TMState_DATA,
+    TMState_CHECKSUM
 };
 
 struct TF_GenericListener_
@@ -197,26 +148,15 @@ struct TinyModbus_
 
     uint16_t lengthReceive;
     uint8_t dataReceive[TF_MAX_PAYLOAD_RX]; //!< Data byte buffer
-    bool discard_data;                      //!< Set if (len > TF_MAX_PAYLOAD) to read the frame, but ignore the data.
 
     /* --- Callbacks --- */
     struct TF_GenericListener_ generic_listeners[TF_MAX_GEN_LST];
     uint8_t count_generic_lst;
 };
 
-// ------------------------ TO BE IMPLEMENTED BY USER ------------------------
-
-/**
- * 'Write bytes' function that sends data to UART
- *
- * ! Implement this in your application code !
- */
-extern void TM_WriteImpl(TinyModbus *tf, const uint8_t *buff, uint32_t len);
-
-/** Claim the TX interface before composing and sending a frame */
+// For implementation in users codebase
+extern void TM_WriteImpl(TinyModbus *tf, uint8_t *buff, uint32_t len);
 extern bool TM_ClaimTx(TinyModbus *tf);
-
-/** Free the TX interface after composing and sending a frame */
 extern void TM_ReleaseTx(TinyModbus *tf);
 
 #endif
