@@ -64,7 +64,14 @@ func TM_WriteImpl(tf *C.TinyModbus, buff *C.uint8_t, len C.uint32_t) {
 func DataListener(tf *C.TinyModbus, msg *C.TM_ResponseMsg) {
 
 	rawBytes := rawToByteArray(msg.data, C.uint32_t(msg.length))
-	fmt.Printf("YES => PARSED FRAME %#v\n", rawBytes)
+	fmt.Print("=>\x1b[34mPARSED FRAME:\n")
+	fmt.Printf("  \x1b[35m peer_address:\x1b[0m %#v\n", msg.peer_address)
+	fmt.Printf("  \x1b[35m function:\x1b[0m %#v\n", msg.function)
+	fmt.Printf("  \x1b[31m is_error:\x1b[0m %t\n", msg.is_error)
+	fmt.Printf("  \x1b[31m error_code:\x1b[0m %#v\n", msg.error_code)
+	fmt.Printf("  \x1b[36m data:\x1b[0m %#v\n", rawBytes)
+	fmt.Printf("  \x1b[36m data_length:\x1b[0m %#v\n", msg.length)
+
 }
 
 func serialBridge() {
@@ -121,15 +128,27 @@ func serialBridge() {
 }
 
 func main() {
-
 	go serialBridge()
 
 	for {
 		time.Sleep(time.Second)
-		data := C.CString(">>")
-		// dataLen := C.ushort(2)
-		C.TM_SendSimple(tm, 0x01, 0x06, 0x2000, 0x0008)
-		C.free(unsafe.Pointer(data))
+		fmt.Println("\x1b[33m=====CMD START===== \x1b[0m")
+		C.TM_SendSimple(tm, 0x01, 0x06, 0x2000, 0x0008) // write start
+		time.Sleep(time.Second)
+		fmt.Println("\x1b[33m=====CMD STOP=====\x1b[0m")
+		C.TM_SendSimple(tm, 0x01, 0x06, 0x2000, 0x0004) // write stop
+		time.Sleep(time.Second)
+		fmt.Println("\x1b[33m=====CMD SET FREQ=====\x1b[0m")
+		C.TM_SendSimple(tm, 0x01, 0x06, 0x010D, 0x2000) // write frequency
+		time.Sleep(time.Second)
+		fmt.Println("\x1b[33m=====CMD GET STATUS=====\x1b[0m")
+		C.TM_SendSimple(tm, 0x01, 0x03, 0x1005, 0x0001) // get status
+		time.Sleep(time.Second)
+		fmt.Println("\x1b[33m=====CMD RESET ERROR=====\x1b[0m")
+		C.TM_SendSimple(tm, 0x01, 0x06, 0x2000, 0x0009) // reset error
+		time.Sleep(time.Second)
+		fmt.Println("\x1b[33m=====CMD GET MULTIPLE REGISTERS=====\x1b[0m")
+		C.TM_SendSimple(tm, 0x01, 0x03, 0x1005, 0x0010) // get status
 	}
 
 }

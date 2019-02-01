@@ -9,17 +9,15 @@
 //---------------------------------------------------------------------------
 
 #include "TM_Config.h"
+#define TM_VERSION "0.1.0"
 
 //---------------------------------------------------------------------------
-
-/** Peer bit enum (used for init) */
 typedef enum
 {
     TM_SLAVE = 0,
     TM_MASTER = 1,
 } TM_Peer;
 
-/** Data structure for sending / receiving messages */
 typedef struct TM_Query_
 {
     uint8_t peer_address;
@@ -31,64 +29,33 @@ typedef struct TM_Query_
 typedef struct TM_RawMessage_
 {
     uint8_t length;
-    uint8_t data[TF_SENDBUF_LEN];
+    uint8_t data[TM_SENDBUF_LEN];
 } TM_RawMessage;
 
-/** Data structure for sending / receiving messages */
 typedef struct TM_ResponseMsg_
 {
     uint8_t peer_address;
     uint8_t function;
+
+    //response data
     uint16_t length;
-    const uint8_t *data;
+    uint8_t *data;
+
+    //error part
+    bool is_error;
+    uint8_t error_code;
+
+    //if response device id mismatch
+    bool wrong_response_peer_id;
+
 } TM_ResponseMsg;
 
 /** TinyFrame struct typedef */
 typedef struct TinyModbus_ TinyModbus;
-
-/**
- * TinyFrame Type Listener callback
- *
- * @param tf - instance
- * @param msg - the received message, userdata is populated inside the object
- * @return listener result
- */
 typedef void (*TM_Listener)(TinyModbus *tf, TM_ResponseMsg *msg);
 
-// ---------------------------------- INIT ------------------------------
-
-/**
- * Initialize the TinyFrame engine.
- * This can also be used to completely reset it (removing all listeners etc).
- *
- * The field .userdata (or .usertag) can be used to identify different instances
- * in the TF_WriteImpl() function etc. Set this field after the init.
- *
- * This function is a wrapper around TF_InitStatic that calls malloc() to obtain
- * the instance.
- *
- * @param tf - instance
- * @param peer_bit - peer bit to use for self
- * @return TF instance or NULL
- */
 TinyModbus *TM_Init(TM_Peer peer_bit);
-
-/**
- * Initialize the TinyFrame engine using a statically allocated instance struct.
- *
- * The .userdata / .usertag field is preserved when TF_InitStatic is called.
- *
- * @param tf - instance
- * @param peer_bit - peer bit to use for self
- * @return success
- */
 bool TM_InitStatic(TinyModbus *tf, TM_Peer peer_bit);
-
-/**
- * De-init the dynamically allocated TF instance
- *
- * @param tf - instance
- */
 void TM_DeInit(TinyModbus *tf);
 
 static inline void TM_ClearResponseMsg(TM_ResponseMsg *msg)
@@ -120,8 +87,6 @@ bool TM_SendSimple(TinyModbus *tf, uint8_t address, uint8_t function, uint16_t r
 bool TM_Send(TinyModbus *tf, TM_QueryMsg *msg);
 
 // ---------------------------------- INTERNAL ----------------------------------
-// This is publicly visible only to allow static init.
-
 enum TM_State_
 {
     TMState_SOF = 0,
@@ -129,7 +94,7 @@ enum TM_State_
     TMState_CHECKSUM
 };
 
-struct TF_GenericListener_
+struct TM_GenericListener_
 {
     TM_Listener fn;
 };
@@ -147,10 +112,10 @@ struct TinyModbus_
     TM_QueryMsg query;
 
     uint16_t lengthReceive;
-    uint8_t dataReceive[TF_MAX_PAYLOAD_RX]; //!< Data byte buffer
+    uint8_t dataReceive[TM_MAX_PAYLOAD_RX]; //!< Data byte buffer
 
     /* --- Callbacks --- */
-    struct TF_GenericListener_ generic_listeners[TF_MAX_GEN_LST];
+    struct TM_GenericListener_ generic_listeners[TM_MAX_LISTENERS];
     uint8_t count_generic_lst;
 };
 

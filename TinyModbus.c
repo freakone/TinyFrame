@@ -4,8 +4,7 @@
 //---------------------------------------------------------------------------
 
 // Helper macros
-#define TF_MIN(a, b) ((a) < (b) ? (a) : (b))
-#define TF_TRY(func)      \
+#define TM_TRY(func)      \
     do                    \
     {                     \
         if (!(func))      \
@@ -35,7 +34,7 @@ TinyModbus *TM_Init(TM_Peer peer_bit)
     TinyModbus *tf = malloc(sizeof(TinyModbus));
     if (!tf)
     {
-        TM_Error("TF_Init() failed, out of memory.");
+        TM_Error("TM_Init() failed, out of memory.");
         return NULL;
     }
 
@@ -55,7 +54,7 @@ void TM_DeInit(TinyModbus *tf)
 //region Listeners
 
 /** Clean up Generic listener */
-static inline void cleanup_generic_listener(TinyModbus *tf, uint8_t i, struct TF_GenericListener_ *lst)
+static inline void cleanup_generic_listener(TinyModbus *tf, uint8_t i, struct TM_GenericListener_ *lst)
 {
     lst->fn = NULL; // Discard listener
     if (i == tf->count_generic_lst - 1)
@@ -68,8 +67,8 @@ static inline void cleanup_generic_listener(TinyModbus *tf, uint8_t i, struct TF
 bool TM_AddGenericListener(TinyModbus *tf, TM_Listener cb)
 {
     uint8_t i;
-    struct TF_GenericListener_ *lst;
-    for (i = 0; i < TF_MAX_GEN_LST; i++)
+    struct TM_GenericListener_ *lst;
+    for (i = 0; i < TM_MAX_LISTENERS; i++)
     {
         lst = &tf->generic_listeners[i];
         // test for empty slot
@@ -92,7 +91,7 @@ bool TM_AddGenericListener(TinyModbus *tf, TM_Listener cb)
 bool TM_RemoveGenericListener(TinyModbus *tf, TM_Listener cb)
 {
     uint8_t i;
-    struct TF_GenericListener_ *lst;
+    struct TM_GenericListener_ *lst;
     for (i = 0; i < tf->count_generic_lst; i++)
     {
         lst = &tf->generic_listeners[i];
@@ -108,11 +107,30 @@ bool TM_RemoveGenericListener(TinyModbus *tf, TM_Listener cb)
     return false;
 }
 
+void TM_ParseResponseMsg(TinyModbus *tf, TM_ResponseMsg *msg)
+{
+    msg->peer_address = tf->dataReceive[0];
+    msg->function = tf->dataReceive[1];
+    msg->is_error = false;
+    msg->error_code = 0;
+    msg->wrong_response_peer_id = tf->query.peer_address != msg->peer_address;
+
+    switch (msg->function)
+    {
+    case 0x86: //error code
+        msg->is_error = true;
+        msg->error_code = tf->dataReceive[2];
+    default:
+        msg->length = tf->lengthReceive - 4;
+        msg->data = &(tf->dataReceive[2]);
+    }
+}
+
 /** Handle a message that was just collected & verified by the parser */
-static void TF_HandleReceivedMessage(TinyModbus *tf)
+static void TM_HandleReceivedMessage(TinyModbus *tf)
 {
     uint8_t i;
-    struct TF_GenericListener_ *glst;
+    struct TM_GenericListener_ *glst;
 
     if (tf->lengthReceive <= 4)
     {
@@ -120,25 +138,19 @@ static void TF_HandleReceivedMessage(TinyModbus *tf)
         return;
     }
 
-    uint16_t crc = TM_CRC16(tf->dataReceive, tf->lengthReceive - 2);
-
+    const uint16_t crc = TM_CRC16(tf->dataReceive, tf->lengthReceive - 2);
     uint16_t crcFromMessage = tf->dataReceive[tf->lengthReceive - 2];
     crcFromMessage |= tf->dataReceive[tf->lengthReceive - 1] << 8;
 
-    printf("CRC CHECK %04X %04X\n", crc, crcFromMessage);
     if (crc != crcFromMessage)
     {
         TM_Error("Unhandled message, wrong checksum");
         return;
     }
 
-    // Prepare message object
     TM_ResponseMsg msg;
     TM_ClearResponseMsg(&msg);
-    msg.function = tf->query.register_address;
-    msg.peer_address = tf->query.peer_address;
-    msg.data = tf->dataReceive;
-    msg.length = tf->lengthReceive;
+    TM_ParseResponseMsg(tf, &msg);
 
     // Generic listeners
     for (i = 0; i < tf->count_generic_lst; i++)
@@ -189,16 +201,6 @@ void TM_Accept(TinyModbus *tf, const uint8_t *buffer, uint32_t count)
 /** Handle a received char - here's the main state machine */
 void TM_AcceptChar(TinyModbus *tf, unsigned char c)
 {
-    // Parser timeout - clear
-    if (tf->parser_timeout_ticks >= TF_PARSER_TIMEOUT_TICKS)
-    {
-        if (tf->state != TMState_SOF)
-        {
-            TF_HandleReceivedMessage(tf);
-            tf->state = TMState_SOF;
-        }
-    }
-
     tf->parser_timeout_ticks = 0;
 
     if (tf->state == TMState_SOF)
@@ -207,7 +209,7 @@ void TM_AcceptChar(TinyModbus *tf, unsigned char c)
         tf->state = TMState_DATA;
     }
 
-    if (tf->lengthReceive + 1 < TF_MAX_PAYLOAD_RX)
+    if (tf->lengthReceive + 1 < TM_MAX_PAYLOAD_RX)
     {
         tf->dataReceive[tf->lengthReceive++] = c;
     }
@@ -240,7 +242,7 @@ TM_RawMessage TM_ConstructModbusBody(TM_QueryMsg *msg)
 
 bool TM_Send(TinyModbus *tf, TM_QueryMsg *msg)
 {
-    TF_TRY(TM_ClaimTx(tf));
+    TM_TRY(TM_ClaimTx(tf));
     tf->query = *msg;
 
     TM_RawMessage raw = TM_ConstructModbusBody(msg);
@@ -267,8 +269,13 @@ bool TM_SendSimple(TinyModbus *tf, uint8_t address, uint8_t function, uint16_t r
 void TM_Tick(TinyModbus *tf)
 {
     // increment parser timeout (timeout is handled when receiving next byte)
-    if (tf->parser_timeout_ticks < TF_PARSER_TIMEOUT_TICKS)
+    if (tf->parser_timeout_ticks < TM_PARSER_TIMEOUT_TICKS)
     {
         tf->parser_timeout_ticks++;
+    }
+    else if (tf->state != TMState_SOF && tf->lengthReceive > 0)
+    {
+        TM_HandleReceivedMessage(tf);
+        tf->state = TMState_SOF;
     }
 }
