@@ -23,7 +23,7 @@
 // this should be defined > 4
 #define TM_PARSER_TIMEOUT_TICKS 5
 // Error reporting function. To disable debug, change to empty define
-#define TM_Error(format, ...) printf("[TM] " format "\n", ##__VA_ARGS__)
+#define TM_Error(format, ...) //printf("[TM] " format "\n", ##__VA_ARGS__)
 
 //------------------------- End of user config ------------------------------
 
