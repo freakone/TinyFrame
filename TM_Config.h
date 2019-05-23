@@ -21,7 +21,7 @@
 // 9600bps -> 1 sign equals to 1000000us / 9600 = 105us
 // lets assume TM_Tick is called once in 100us
 // this should be defined > 4
-#define TM_PARSER_TIMEOUT_TICKS 5
+#define TM_PARSER_TIMEOUT_TICKS 100
 // Error reporting function. To disable debug, change to empty define
 #define TM_Error(format, ...) //printf("[TM] " format "\n", ##__VA_ARGS__)
 
