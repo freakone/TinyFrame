@@ -25,7 +25,8 @@ extern "C"
         TM_READ_ANALOG_INPUTS = 0x04,
         TM_WRITE_COIL = 0x05,
         TM_WRITE_HOLDING_REGISTER = 0x06,
-        TM_READ_EXCEPTION = 0x07
+        TM_READ_EXCEPTION = 0x07,
+        TM_WRITE_MULTIPLE_HOLDING_REGISTERS = 0x10
     } TM_COMMAND;
 
     typedef enum
@@ -40,6 +41,8 @@ extern "C"
         uint8_t function;
         uint16_t register_address;
         uint16_t data;
+        uint16_t multipart_data[50];
+        uint16_t multipart_length;
     } TM_QueryMsg;
 
     typedef struct TM_RawMessage_
@@ -106,6 +109,7 @@ extern "C"
     // ---------------------------- FRAME TX FUNCTIONS ------------------------------
 
     bool TM_SendSimple(TinyModbus *tf, uint8_t address, uint8_t function, uint16_t register_address, uint16_t data);
+    bool TM_SendMultipartSimple(TinyModbus *tf, uint8_t address, uint8_t function, uint16_t register_address, uint16_t *data, uint16_t length);
     bool TM_Send(TinyModbus *tf, TM_QueryMsg *msg);
 
     // ---------------------------------- INTERNAL ----------------------------------

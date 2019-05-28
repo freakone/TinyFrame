@@ -238,7 +238,28 @@ TM_RawMessage TM_ConstructModbusBody(TM_QueryMsg *msg)
 
     switch (msg->function)
     {
+    case TM_WRITE_MULTIPLE_HOLDING_REGISTERS:
+    {
+        raw.length = 9 + msg->multipart_length * 2;
+        raw.data[2] = msg->register_address >> 8;
+        raw.data[3] = msg->register_address & 0xFF;
+        raw.data[4] = msg->multipart_length >> 8;
+        raw.data[5] = msg->multipart_length & 0xFF;
+        raw.data[6] = msg->multipart_length * 2;
+
+        for (uint8_t i = 0; i < msg->multipart_length; i++)
+        {
+            raw.data[7 + i * 2] = msg->multipart_data[i] >> 8;
+            raw.data[8 + i * 2] = msg->multipart_data[i] & 0xFF;
+        }
+
+        uint16_t crc = TM_CRC16(raw.data, 7 + msg->multipart_length * 2);
+        raw.data[raw.length - 2] = crc & 0xFF;
+        raw.data[raw.length - 1] = crc >> 8;
+        break;
+    }
     default:
+    {
         raw.length = 8;
         raw.data[2] = msg->register_address >> 8;
         raw.data[3] = msg->register_address & 0xFF;
@@ -249,6 +270,7 @@ TM_RawMessage TM_ConstructModbusBody(TM_QueryMsg *msg)
         raw.data[6] = crc & 0xFF;
         raw.data[7] = crc >> 8;
         break;
+    }
     }
 
     return raw;
@@ -276,6 +298,23 @@ bool TM_Send(TinyModbus *tf, TM_QueryMsg *msg)
     }
 
     return sent;
+}
+
+bool TM_SendMultipartSimple(TinyModbus *tf, uint8_t address, uint8_t function, uint16_t register_address, uint16_t *data, uint16_t length)
+{
+    TM_QueryMsg msg;
+    TM_ClearQueryMsg(&msg);
+    msg.peer_address = address;
+    msg.function = function;
+    msg.register_address = register_address;
+    msg.multipart_length = length;
+
+    for (uint16_t i = 0; i < length; i++)
+    {
+        msg.multipart_data[i] = data[i];
+    }
+
+    return TM_Send(tf, &msg);
 }
 
 bool TM_SendSimple(TinyModbus *tf, uint8_t address, uint8_t function, uint16_t register_address, uint16_t data)
