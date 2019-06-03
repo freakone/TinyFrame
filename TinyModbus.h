@@ -96,10 +96,6 @@ extern "C"
     void TM_AcceptChar(TinyModbus *tf, uint8_t c);
     void TM_Tick(TinyModbus *tf);
     void TM_ResetParser(TinyModbus *tf);
-    static bool TM_IsReadFunction(uint8_t function_code) { return function_code == TM_READ_ANALOG_INPUTS ||
-                                                                  function_code == TM_READ_COILS ||
-                                                                  function_code == TM_READ_HOLDING_REGISTERS ||
-                                                                  function_code == TM_READ_INPUTS; };
 
     // ---------------------------- MESSAGE LISTENERS -------------------------------
 
